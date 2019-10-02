@@ -5,6 +5,7 @@
 #
 *.db
 *report.xml
+coverage.txt
 .DS_Store
 .vscode
 debug.test

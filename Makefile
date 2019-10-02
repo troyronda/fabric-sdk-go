@@ -647,6 +647,7 @@ clean-tests-build:
 clean-tests-temp:
 	-rm -Rf /tmp/enroll_user /tmp/msp /tmp/keyvaluestore /tmp/hfc-kvs /tmp/state /tmp/state-store
 	-rm -f integration-report.xml report.xml
+	-rm -f coverage.txt
 
 .PHONY: clean-tests
 clean-tests: clean-tests-temp clean-tests-build

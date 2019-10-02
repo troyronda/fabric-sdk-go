@@ -26,6 +26,12 @@ jobs:
   # TODO: resolve dependencies between dependencies.sh and install_deps.yml
   - script: make unit-test
     displayName: Run checks and unit test
+  - script: gobin -run github.com/axw/gocov/gocov@master convert ./coverage.txt | gobin -run github.com/AlekSi/gocov-xml > ./coverage.xml
+    displayName: Convert coverage report to cobertura format
+  - task: PublishCodeCoverageResults@1
+    inputs:
+      codeCoverageTool: 'cobertura'
+      summaryFileLocation: ./coverage.xml
 
 - job: IntegrationTest
   pool:
