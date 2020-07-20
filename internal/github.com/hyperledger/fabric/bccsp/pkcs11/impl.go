@@ -15,10 +15,10 @@ import (
 	"crypto/x509"
 	"os"
 
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/bccsp"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/bccsp/sw"
-	flogging "github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/sdkpatch/logbridge"
-	sdkp11 "github.com/hyperledger/fabric-sdk-go/pkg/core/cryptosuite/common/pkcs11"
+	"github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric/bccsp/sw"
+	"github.com/hyperledger/fabric/common/flogging"
+	"github.com/miekg/pkcs11"
 	"github.com/pkg/errors"
 )
 
@@ -37,22 +37,28 @@ func New(opts PKCS11Opts, keyStore bccsp.KeyStore) (bccsp.BCCSP, error) {
 		return nil, errors.Wrapf(err, "Failed initializing configuration")
 	}
 
-	swCSP, err := sw.NewWithParams(opts.SecLevel, opts.HashFamily, keyStore)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed initializing fallback SW BCCSP")
-	}
-
 	// Check KeyStore
 	if keyStore == nil {
 		return nil, errors.New("Invalid bccsp.KeyStore instance. It must be different from nil")
 	}
 
-	//Load PKCS11 context handle
-	pkcs11Ctx, err := sdkp11.LoadContextAndLogin(opts.Library, opts.Pin, opts.Label)
+	swCSP, err := sw.NewWithParams(opts.SecLevel, opts.HashFamily, keyStore)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed initializing PKCS11 context")
+		return nil, errors.Wrapf(err, "Failed initializing fallback SW BCCSP")
 	}
-	csp := &impl{BCCSP: swCSP, conf: conf, softVerify: opts.SoftVerify, pkcs11Ctx: pkcs11Ctx}
+
+	lib := opts.Library
+	pin := opts.Pin
+	label := opts.Label
+	ctx, slot, session, err := loadLib(lib, pin, label)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed initializing PKCS11 library %s %s",
+			lib, label)
+	}
+
+	sessions := make(chan pkcs11.SessionHandle, sessionCacheSize)
+	csp := &impl{swCSP, conf, ctx, sessions, slot, lib, opts.SoftVerify, opts.Immutable}
+	csp.returnSession(*session)
 	return csp, nil
 }
 
@@ -61,7 +67,11 @@ type impl struct {
 
 	conf *config
 
-	pkcs11Ctx  *sdkp11.ContextHandle
+	ctx      *pkcs11.Ctx
+	sessions chan pkcs11.SessionHandle
+	slot     uint
+
+	lib        string
 	softVerify bool
 	//Immutable flag makes object immutable
 	immutable bool
