@@ -21,15 +21,16 @@ import (
 
 	kitstatsd "github.com/go-kit/kit/metrics/statsd"
 	"github.com/hyperledger/fabric-lib-go/healthz"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/common/metrics"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/common/metrics/disabled"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/common/metrics/prometheus"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/common/metrics/statsd"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/common/metrics/statsd/goruntime"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/common/util"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/core/middleware"
-	flogging "github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/sdkpatch/logbridge"
-	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/sdkpatch/logbridge/httpadmin"
+	"github.com/hyperledger/fabric/common/flogging"
+	"github.com/hyperledger/fabric/common/flogging/httpadmin"
+	"github.com/hyperledger/fabric/common/metadata"
+	"github.com/hyperledger/fabric/common/metrics"
+	"github.com/hyperledger/fabric/common/metrics/disabled"
+	"github.com/hyperledger/fabric/common/metrics/prometheus"
+	"github.com/hyperledger/fabric/common/metrics/statsd"
+	"github.com/hyperledger/fabric/common/metrics/statsd/goruntime"
+	"github.com/hyperledger/fabric/common/util"
+	"github.com/hyperledger/fabric/core/middleware"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -90,6 +91,7 @@ func NewSystem(o Options) *System {
 	system.initializeHealthCheckHandler()
 	system.initializeLoggingHandler()
 	system.initializeMetricsProvider()
+	system.initializeVersionInfoHandler()
 
 	return system
 }
@@ -102,10 +104,8 @@ func (s *System) Run(signals <-chan os.Signal, ready chan<- struct{}) error {
 
 	close(ready)
 
-	select {
-	case <-signals:
-		return s.Stop()
-	}
+	<-signals
+	return s.Stop()
 }
 
 func (s *System) Start() error {
@@ -203,6 +203,27 @@ func (s *System) initializeLoggingHandler() {
 func (s *System) initializeHealthCheckHandler() {
 	s.healthHandler = healthz.NewHealthHandler()
 	s.mux.Handle("/healthz", s.handlerChain(s.healthHandler, false))
+}
+
+func (s *System) initializeVersionInfoHandler() {
+	versionInfo := &VersionInfoHandler{
+		CommitSHA: metadata.CommitSHA,
+		Version:   metadata.Version,
+	}
+	s.mux.Handle("/version", s.handlerChain(versionInfo, false))
+}
+
+// RegisterHandler registers into the ServeMux a handler chain that borrows its security properties from the
+// operations.System. This method is thread safe because ServeMux.Handle() is thread safe, and options are immutable.
+// This method can be called either before or after System.Start(). If the pattern exists the method panics.
+func (s *System) RegisterHandler(pattern string, handler http.Handler) {
+	s.mux.Handle(
+		pattern,
+		s.handlerChain(
+			handler,
+			s.options.TLS.Enabled,
+		),
+	)
 }
 
 func (s *System) startMetricsTickers() error {
