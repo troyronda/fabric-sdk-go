@@ -21,9 +21,9 @@ import (
 	ab "github.com/hyperledger/fabric-protos-go/orderer"
 	"github.com/hyperledger/fabric-protos-go/orderer/etcdraft"
 	pb "github.com/hyperledger/fabric-protos-go/peer"
-	"github.com/hyperledger/fabric/bccsp"
-	"github.com/hyperledger/fabric/bccsp/factory"
-	"github.com/hyperledger/fabric/protoutil"
+	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/bccsp"
+	"github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/protoutil"
+	"github.com/hyperledger/fabric-sdk-go/pkg/common/providers/core"
 	"github.com/pkg/errors"
 )
 
@@ -245,39 +245,7 @@ func ACLValues(acls map[string]string) *StandardConfigValue {
 }
 
 // ValidateCapabilities validates whether the peer can meet the capabilities requirement in the given config block
-func ValidateCapabilities(block *cb.Block, bccsp bccsp.BCCSP) error {
-	cc, err := extractChannelConfig(block, bccsp)
-	if err != nil {
-		return err
-	}
-	// Check the channel top-level capabilities
-	if err := cc.Capabilities().Supported(); err != nil {
-		return err
-	}
-
-	// Check the application capabilities
-	return cc.ApplicationConfig().Capabilities().Supported()
-}
-
-// ExtractMSPIDsForApplicationOrgs extracts MSPIDs for application organizations
-func ExtractMSPIDsForApplicationOrgs(block *cb.Block, bccsp bccsp.BCCSP) ([]string, error) {
-	cc, err := extractChannelConfig(block, factory.GetDefault())
-	if err != nil {
-		return nil, err
-	}
-
-	if cc.ApplicationConfig() == nil {
-		return nil, errors.Errorf("could not get application config for the channel")
-	}
-	orgs := cc.ApplicationConfig().Organizations()
-	mspids := make([]string, 0, len(orgs))
-	for _, org := range orgs {
-		mspids = append(mspids, org.MSPID())
-	}
-	return mspids, nil
-}
-
-func extractChannelConfig(block *cb.Block, bccsp bccsp.BCCSP) (*ChannelConfig, error) {
+func ValidateCapabilities(block *cb.Block, bccsp core.CryptoSuite) error {
 	envelopeConfig, err := protoutil.ExtractEnvelope(block, 0)
 	if err != nil {
 		return nil, errors.WithMessage(err, "malformed configuration block")

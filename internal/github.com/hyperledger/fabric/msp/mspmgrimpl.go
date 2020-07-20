@@ -13,7 +13,7 @@ package msp
 import (
 	"github.com/golang/protobuf/proto"
 	"github.com/hyperledger/fabric-protos-go/msp"
-	"github.com/hyperledger/fabric/common/flogging"
+	flogging "github.com/hyperledger/fabric-sdk-go/internal/github.com/hyperledger/fabric/sdkpatch/logbridge"
 	"github.com/pkg/errors"
 )
 
@@ -92,8 +92,6 @@ func (mgr *mspManagerImpl) DeserializeIdentity(serializedID []byte) (Identity, e
 
 	switch t := msp.(type) {
 	case *bccspmsp:
-		return t.deserializeIdentityInternal(sId.IdBytes)
-	case *idemixmsp:
 		return t.deserializeIdentityInternal(sId.IdBytes)
 	default:
 		return t.DeserializeIdentity(serializedID)
