@@ -131,8 +131,7 @@ func (ccpack *CDSPackage) getCDSData(cds *pb.ChaincodeDeploymentSpec) ([]byte, [
 		panic("nil cds")
 	}
 
-	b, err := proto.Marshal(cds)
-	if err != nil {
+	if _, err := proto.Marshal(cds); err != nil {
 		return nil, nil, nil, err
 	}
 
@@ -157,7 +156,7 @@ func (ccpack *CDSPackage) getCDSData(cds *pb.ChaincodeDeploymentSpec) ([]byte, [
 
 	cdsdata.MetaDataHash = hash.Sum(nil)
 
-	b, err = proto.Marshal(cdsdata)
+	b, err := proto.Marshal(cdsdata)
 	if err != nil {
 		return nil, nil, nil, err
 	}
